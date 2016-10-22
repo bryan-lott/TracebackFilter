@@ -1,0 +1,65 @@
+2016-10-21 10:56:23,735 - INFO - connectionpool.py - Starting new HTTPS connection (6): superset-output.s3.amazonaws.com
+2016-10-21 10:56:23,735 - INFO - connectionpool.py - Starting new HTTPS connection (7): superset-output.s3.amazonaws.com
+2016-10-21 10:56:23,743 - INFO - connectionpool.py - Starting new HTTPS connection (8): superset-output.s3.amazonaws.com
+2016-10-21 10:56:23,744 - INFO - connectionpool.py - Starting new HTTPS connection (9): superset-output.s3.amazonaws.com
+2016-10-21 10:56:23,744 - INFO - connectionpool.py - Starting new HTTPS connection (10): superset-output.s3.amazonaws.com
+2016-10-21 10:56:35,531 - INFO - hive.py - Refreshing raw.presentation_ss_panel_hist hive data
+2016-10-21 10:56:46,783 - INFO - hive.py - Refreshing default.presentation_ss_panel_hist hive data for day=20161019
+2016-10-21 10:58:32,649 - INFO - report_historical_panel.py - nb rows written: 3034221
+2016-10-21 10:58:45,811 - INFO - report_historical_panel.py - all done.
+Fri Oct 21 10:58:46 UTC 2016 Terminating cluster j-34WZZYYC0GDLO
+Fri Oct 21 10:58:46 UTC 2016 validating superset
+upload: ../log/superset_check.log to s3://analytics-scripts/superset_logs/superset_check.log
+Completed 1 of 2 part(s) with 1 file(s) remaining^Mupload: ../log/superset_check.log.1 to s3://analytics-scripts/superset_logs/superset_check.log.1
+2016-10-21 12:15:34,191 - INFO - send_superset_status.py - starting
+Traceback (most recent call last):
+  File "./send_superset_status.py", line 227, in <module>
+    main(args, config)
+  File "./send_superset_status.py", line 191, in main
+    send_email(config, html, args.recipients.split(','), chart_filename)
+  File "./send_superset_status.py", line 176, in send_email
+    sender.send(message)
+  File "/usr/lib/python2.7/dist-packages/mailer.py", line 110, in send
+    self._send(server, msg)
+  File "/usr/lib/python2.7/dist-packages/mailer.py", line 140, in _send
+    server.sendmail(me, you, msg.as_string())
+  File "/usr/lib/python2.7/smtplib.py", line 746, in sendmail
+    raise SMTPDataError(code, resp)
+smtplib.SMTPDataError: (454, 'Temporary service failure')
+Fri Oct 21 12:15:40 UTC 2016 [skipping] lost yahoo users
+[skipping] Running stats report
+Running post-superset tasks
+Fri Oct 21 12:39:57 UTC 2016 Created transient cluster j-2ZXGA9E2KQ5EG
+Fri Oct 21 12:39:57 UTC 2016 Using hive server 10.127.57.98:10000
+Fri Oct 21 12:39:57 UTC 2016 sources to investigate
+2016-10-21 12:43:09,344 - INFO - connectionpool.py - Starting new HTTP connection (1): 169.254.169.254
+2016-10-21 12:43:09,346 - INFO - connectionpool.py - Starting new HTTP connection (1): 169.254.169.254
+2016-10-21 12:43:09,347 - INFO - credentials.py - Found credentials from IAM Role: classification
+2016-10-21 12:43:09,742 - INFO - connectionpool.py - Starting new HTTPS connection (1): email.us-east-1.amazonaws.com
+Fri Oct 21 12:43:25 UTC 2016 building md5 report
+2016-10-21 12:43:25,331 - INFO - md5_report.py - starting
+2016-10-21 12:43:53,711 - INFO - md5_report.py - all done.
+Fri Oct 21 12:43:53 UTC 2016 all non-ss vendors
+next line
+testing
+testing
+testing2
+testing3
+testing4
+testing5
+testing6
+testing7
+testing8
+testing9
+testing0
+testing11111
+testing11111
+testing6
+testing6
+testing6
+testing6\ntesting7\ntesting8
+testing
+test8
+test9
+test10
+test11
