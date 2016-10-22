@@ -11,5 +11,5 @@ java -jar tracebackfilter.jar /path/to/your/logfile/here.log
 ## Dockerhub
 ```bash
 docker pull mystickphoenix/tracebackfilter
-docker run mystickphoenix/tracebackfilter /path/to/your/logfile/here.log
+docker run -d --rm -v /path/to/your/logfile/here.log:/log/monitor.log -v /path/to/your/aws/credentials/.aws:/root/.aws mystickphoenix/tracebackfilter
 ```
