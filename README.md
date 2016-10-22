@@ -1,14 +1,17 @@
-# tracebackfilter
-
-A Clojure library designed to ... well, that part is up to you.
+# TracebackFilter
+Tails a log file and filters for python-style Tracebacks, sending them to an AWS SNS topic
 
 ## Usage
+```bash
+export TBF_SNS_TOPIC="arn-to-your-sns-topic-here"
+export TBF_SNS_SUBJECT="your message subject"
+java -jar tracebackfilter.jar /path/to/your/logfile/here
+```
 
-FIXME
+## Dockerhub
+```bash
+docker pull mystickphoenix/tracebackfilter
+```
 
-## License
 
-Copyright © 2016 FIXME
 
-Distributed under the Eclipse Public License either version 1.0 or (at
-your option) any later version.
