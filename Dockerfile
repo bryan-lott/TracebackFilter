@@ -7,4 +7,4 @@ COPY ./target/uberjar/tracebackfilter-0.1.0-SNAPSHOT-standalone.jar /code/traceb
 
 WORKDIR /code
 
-CMD ["java","-jar","/code/tracebackfilter.jar","/code/log/superset.log"]
+CMD ["java","-jar","/code/tracebackfilter.jar"]
