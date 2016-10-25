@@ -30,18 +30,6 @@
          (cons (first s) (take-to-first pred (rest s)))
          (list (first s))))))
 
-(defn partition-when
-  "Applies f to each value in coll, splitting it each time f returns
-   true. Returns a lazy seq of lazy seqs.
-  taken from: https://groups.google.com/forum/#!topic/clojure/Gs6UtrRSLv8"
-  [f coll]
-  (when-let [s (seq coll)]
-    (lazy-seq
-      (let [run (take-to-first f s)
-            res (drop (count run) s)]
-          (cons run (partition-when f res))))))
-
-
 (defn drop-to-first
   "Returns a lazy sequence of successive items from coll after
   the point and including the point at which (pred item) returns true.

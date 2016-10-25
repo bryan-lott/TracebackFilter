@@ -35,29 +35,6 @@ Running post-superset tasks")
     (is (= [1 1 1]
            (take-to-first even? [1 1 1])))))
 
-(deftest test-partition-when
-  (testing "Found single split point"
-    (is (= [[1 1 2] [1 1]]
-           (partition-when even? [1 1 2 1 1])))
-    (is (= [[2] [1 1]]
-           (partition-when even? [2 1 1])))
-    (is (= [[1 1 2]]
-           (partition-when even? [1 1 2]))))
-  (testing "Found multiple split points"
-    (is (= [[2] [2]]
-           (partition-when even? [2 2])))
-    (is (= [[1 2] [1 2]]
-           (partition-when even? [1 2 1 2])))
-    (is (= [[1 2] [1 2] [1]]
-           (partition-when even? [1 2 1 2 1]))))
-  (testing "Found no split points"
-    (is (= [[1 1 1]]
-           (partition-when even? [1 1 1])))
-    (is (= nil  ;; this is broken
-           (partition-when even? [])))
-    (is (= [[1 1 3 3]]
-           (partition-when even? [1 1 3 3])))))
-
 (deftest test-drop-to-first
   (testing "Drop point"
     (is (= [2 1 1]
