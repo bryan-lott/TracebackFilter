@@ -6,6 +6,15 @@
   (:gen-class))
 
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Environment Variable Configs
+(defn slack-sns-topic []
+  (System/getenv "TBF_SNS_TOPIC"))
+
+(defn slack-sns-subject []
+  (System/getenv "TBF_SNS_SUBJECT"))
+
+
 ;;;;;;;;;;;;;;;;;;;;;
 ;; Sequence Functions
 
@@ -44,38 +53,50 @@
         (drop-to-first pred (rest s))
         s))))
 
+
 (defn partition-inside
   "Grabs whats between and including the pred-start and pred-stop.
   pred-start and pred-stop should not be the same predicate.
-  if the data is of a 'nested' format and pred-start can happen multiple times before a pred-stop,
-  unpredicatble behavior may occur.  I have not tested for this condition."
+  if the data is of a 'nested' format each of the nestings will be returned."
   [pred-start pred-stop coll]
-  (when-let [s (seq coll)]
-    (lazy-seq
-      (let [run (take-to-first pred-stop (drop-to-first pred-start s))
-            res (drop (count (take-to-first pred-start s)) s)]
-        (cons run (partition-inside pred-start pred-stop res))))))
+  (lazy-seq
+    (butlast
+      (loop [coll coll
+             acc []]
+        (if (empty? coll)
+          acc
+          (recur (drop (count (take-to-first pred-start coll)) coll)
+                 (conj acc (take-to-first pred-stop (drop-to-first pred-start coll)))))))))
 
 
 ;;;;;;;;;;;;;;
 ;; File access
+(defn reopen [input-filename raf]
+  "Close and reopen the provided file.
+  This is to be able to follow logrotate when it switches."
+  (let [offset (.getFilePointer raf)]
+    (do
+      (.close raf)
+      (let [raf (RandomAccessFile. input-filename "r")]
+        (if (> offset (.length raf))  ;; detect if the file's been truncated
+          (.seek raf 0)
+          (.seek raf offset))
+        raf))))
 
 (defn raf-seq
   "Tail the provided file."
-  [#^RandomAccessFile raf]
+  [input-filename #^RandomAccessFile raf]
   (if-let [line (.readLine raf)]
     (lazy-seq (cons line (raf-seq raf)))
     (do (Thread/sleep 1000)
-        (if (> (.getFilePointer raf) (.length raf))  ;; detect if the file has been truncated
-          (.seek raf 0))
-        (recur raf))))
+        (recur input-filename (reopen input-filename raf)))))
 
 (defn tail-seq
   "Seek the end of the input file and start tailing it."
-  [input]
-  (let [raf (RandomAccessFile. input "r")]
+  [input-filename]
+  (let [raf (RandomAccessFile. input-filename "r")]
     (.seek raf (.length raf))
-    (raf-seq raf)))
+    (raf-seq input-filename raf)))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -88,7 +109,7 @@
 
 (defn traceback-end?
   "Returns true once we're no longer in a traceback.
-  Also attempts to capture details from psycopg2 tracebacks which are grungier."
+  Also attempts to capture details from AWS psycopg2 tracebacks which are grungier."
   [v]
   (and
     (not (starts-with? v " "))
@@ -96,18 +117,11 @@
     (not (starts-with? v "psycopg2"))
     (not (starts-with? v "DETAIL"))))
 
-
-
+;;;;;;;;;;;;;;;;;;;;
+;; Command & Control
 (defn extract-traceback [input]
   "Given a streaming input (a log), outputs only the tracebacks."
   (partition-inside traceback-start? traceback-end? input))
-
-
-(defn slack-sns-topic []
-  (System/getenv "TBF_SNS_TOPIC"))
-
-(defn slack-sns-subject []
-  (System/getenv "TBF_SNS_SUBJECT"))
 
 (defn traceback-from-file [topic subject filename]
   "Given a filename, push the text of any tracebacks to the SNS topic."
@@ -116,7 +130,6 @@
     (sns/publish :topic-arn topic
                  :subject (str subject " - " (last traceback))
                  :message (join "\n" traceback))))
-
 
 (defn -main
   [& args]
