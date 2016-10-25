@@ -109,15 +109,20 @@
 (defn slack-sns-subject []
   (System/getenv "TBF_SNS_SUBJECT"))
 
-(defn traceback-from-file [filename]
-  "Given a filename, push the text of any tracebacks to the ci-aws-notifications channel."
+(defn traceback-from-file [topic subject filename]
+  "Given a filename, push the text of any tracebacks to the SNS topic."
   (doseq
     [traceback (extract-traceback (tail-seq filename))]
-    (sns/publish :topic-arn (slack-sns-topic)
-                 :subject (str (slack-sns-subject) " - " (last traceback))
+    (sns/publish :topic-arn topic
+                 :subject (str subject " - " (last traceback))
                  :message (join "\n" traceback))))
 
 
 (defn -main
   [& args]
-  (traceback-from-file (first args)))
+  (let [topic (slack-sns-topic)
+        subject (slack-sns-subject)]
+    (println (str "Sending tracebacks from " (first args)
+                  " to SNS Topic: " topic
+                  ", Subject Prefix: " subject))
+    (traceback-from-file topic subject (first args))))
