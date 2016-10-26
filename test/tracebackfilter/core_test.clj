@@ -88,4 +88,3 @@ Running other tasks")
     (is (false? (traceback-end? "psycopg2 is a tricky one to extract")))
     (is (false? (traceback-end? "Traceback's shouldn't be nested")))
     (is (false? (traceback-end? "DETAILs are important for context")))))
-

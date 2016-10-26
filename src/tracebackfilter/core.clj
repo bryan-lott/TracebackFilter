@@ -76,9 +76,10 @@
   "Tail the provided file."
   [input-filename #^RandomAccessFile raf]
   (if-let [line (.readLine raf)]
-    (lazy-seq (cons line (raf-seq raf)))
+    (lazy-seq (cons line (raf-seq input-filename raf)))
     (do (Thread/sleep 1000)
-        (recur input-filename (reopen input-filename raf)))))
+        (recur input-filename
+               (reopen input-filename raf)))))
 
 (defn tail-seq
   "Seek the end of the input file and start tailing it."
@@ -104,7 +105,10 @@
     (not (starts-with? v " "))
     (not (traceback-start? v))
     (not (starts-with? v "psycopg2"))
-    (not (starts-with? v "DETAIL"))))
+    (not (starts-with? v "DETAIL"))
+    (not (= v ""))
+    (not (= v "\n"))
+    (not (= v "\r\n"))))
 
 ;;;;;;;;;;;;;;;;;;;;
 ;; Command & Control
@@ -125,7 +129,6 @@
   [& args]
   (let [topic (slack-sns-topic)
         subject (slack-sns-subject)]
-    (println (str "Sending tracebacks from " (first args)
-                  " to SNS Topic: " topic
+    (println (str "Sending tracebacks to SNS Topic: " topic
                   ", Subject Prefix: " subject))
     (traceback-from-file topic subject (first args))))
