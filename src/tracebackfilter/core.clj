@@ -2,7 +2,8 @@
   (:import (java.io RandomAccessFile))
   (:require [clojure.string :refer [join starts-with?]]
             [amazonica.aws.sns :as sns]
-            [clojure.tools.cli :refer [parse-opts]])
+            [clojure.tools.cli :refer [parse-opts]]
+            [clojure.tools.logging :as log])
   (:gen-class))
 
 
@@ -117,7 +118,8 @@
     [traceback (extract-traceback (tail-seq filename))]
     (sns/publish :topic-arn topic
                  :subject (str subject " - " (last traceback))
-                 :message (join "\n" traceback))))
+                 :message (join "\n" traceback))
+    (log/info (str "Traceback sent to " topic " with subject: " subject " - " (last traceback)))))
 
 (defn -main
   [& args]

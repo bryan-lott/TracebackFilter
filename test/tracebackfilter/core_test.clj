@@ -2,13 +2,13 @@
   (:require [clojure.test :refer :all]
             [tracebackfilter.core :refer :all]))
 
-(def real-log "2016-10-21 12:15:34,191 - INFO - send_superset_status.py - starting
+(def real-log "2016-10-21 12:15:34,191 - INFO - send_status.py - starting
 Traceback (most recent call last):
-  File \"./send_superset_status.py\", line 227, in <module>
+  File \"./send_status.py\", line 227, in <module>
     main(args, config)
-  File \"./send_superset_status.py\", line 191, in main
+  File \"./send_status.py\", line 191, in main
     send_email(config, html, args.recipients.split(','), chart_filename)
-  File \"./send_superset_status.py\", line 176, in send_email
+  File \"./send_status.py\", line 176, in send_email
     sender.send(message)
   File \"/usr/lib/python2.7/dist-packages/mailer.py\", line 110, in send
     self._send(server, msg)
@@ -17,9 +17,9 @@ Traceback (most recent call last):
   File \"/usr/lib/python2.7/smtplib.py\", line 746, in sendmail
     raise SMTPDataError(code, resp)
 smtplib.SMTPDataError: (454, 'Temporary service failure')
-Fri Oct 21 12:15:40 UTC 2016 [skipping] lost yahoo users
-[skipping] Running stats report
-Running post-superset tasks")
+Fri Oct 21 12:15:40 UTC 2016 [skipping] report
+[skipping] Running report
+Running other tasks")
 
 (deftest test-take-to-first
   (testing "Found a split point"

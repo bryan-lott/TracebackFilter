@@ -2,6 +2,7 @@
   :description "extract multi-line log information and send to external"
   :url "http://example.com/FIXME"
   :dependencies [[org.clojure/clojure "1.8.0"]
+                 [org.clojure/tools.logging "0.3.1"] ;; logging
                  [org.clojure/tools.cli "0.3.5"] ;; arg parsing
                  [amazonica "0.3.76"]]
   :target-path "target/%s"
