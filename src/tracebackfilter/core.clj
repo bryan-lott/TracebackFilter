@@ -1,6 +1,6 @@
 (ns tracebackfilter.core
   (:import (java.io RandomAccessFile))
-  (:require [clojure.string :refer [join starts-with?]]
+  (:require [clojure.string :refer [join starts-with? split]]
             [amazonica.aws.sns :as sns]
             [clojure.tools.cli :refer [parse-opts]]
             [clojure.tools.logging :as log])
@@ -42,20 +42,16 @@
         (drop-to-first pred (rest s))
         s))))
 
-
 (defn partition-inside
   "Grabs whats between and including the pred-start and pred-stop.
   pred-start and pred-stop should not be the same predicate.
   if the data is of a 'nested' format each of the nestings will be returned."
   [pred-start pred-stop coll]
-  (lazy-seq
-    (butlast
-      (loop [coll coll
-             acc []]
-        (if (empty? coll)
-          acc
-          (recur (drop (count (take-to-first pred-start coll)) coll)
-                 (conj acc (take-to-first pred-stop (drop-to-first pred-start coll)))))))))
+  (when-let [s (seq coll)]
+    (lazy-seq
+      (let [run (take-to-first pred-stop (drop-to-first pred-start s))
+            res (drop (count (take-to-first pred-start s)) s)]
+          (cons run (partition-inside pred-start pred-stop res))))))
 
 
 ;;;;;;;;;;;;;;
@@ -88,7 +84,6 @@
     (.seek raf (.length raf))
     (raf-seq input-filename raf)))
 
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Traceback "fencepost" predicates
 
@@ -120,15 +115,16 @@
   "Given a filename, push the text of any tracebacks to the SNS topic."
   (doseq
     [traceback (extract-traceback (tail-seq filename))]
-    (sns/publish :topic-arn topic
-                 :subject (str subject " - " (last traceback))
-                 :message (join "\n" traceback))
-    (log/info (str "Traceback sent to " topic " with subject: " subject " - " (last traceback)))))
+    (let [sns-subject (str subject " - " (first (split (last traceback) #"\s")))] 
+      (sns/publish :topic-arn topic
+                  :subject sns-subject
+                  :message (join "\n" traceback))
+      (log/info (str "Traceback sent to " topic " with subject: " sns-subject)))))
 
 (defn -main
   [& args]
   (let [topic (slack-sns-topic)
         subject (slack-sns-subject)]
-    (println (str "Sending tracebacks to SNS Topic: " topic
+    (log/info (str "Sending tracebacks to SNS Topic: " topic
                   ", Subject Prefix: " subject))
     (traceback-from-file topic subject (first args))))
