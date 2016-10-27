@@ -126,5 +126,5 @@
   (let [topic (slack-sns-topic)
         subject (slack-sns-subject)]
     (log/info (str "Sending tracebacks to SNS Topic: " topic
-                  ", Subject Prefix: " subject))
+                   ", Subject Prefix: " subject))
     (traceback-from-file topic subject (first args))))
