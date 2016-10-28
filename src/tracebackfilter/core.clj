@@ -86,44 +86,127 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Traceback "fencepost" predicates
 
-(defn traceback-start?
-  "Returns true when we start a traceback."
-  [v]
-  (starts-with? v "Traceback"))
+(defn capture
+  "Given a regex, exclude or include based on value of negative
+  and whether the regex returns a value after being run over s."
+  [regex negative s]
+  (if negative
+    (nil? (re-find regex s))
+    (not (nil? (re-find regex s)))))
 
-(defn traceback-end?
-  "Returns true once we're no longer in a traceback.
-  Also attempts to capture details from AWS psycopg2 tracebacks which are grungier."
-  [v]
-  (and
-    (not (starts-with? v " "))
-    (not (traceback-start? v))
-    (not (starts-with? v "psycopg2"))
-    (not (starts-with? v "DETAIL"))
-    (not (= v ""))
-    (not (= v "\n"))
-    (not (= v "\r\n"))))
+(def start-capture
+  "Start capturing data after this if it returns true."
+  (partial capture #"^Traceback" false))
+
+(def end-capture
+  "Stop capturing data if we get a line that doesn't match this regex."
+  (partial capture #"^\s+|^Traceback|^[\w\.]+:\s+|^DETAIL|^$|^Attempt \d+ failed" true))
+
+(defn extract-lines [input]
+  "Given a streaming input (a log), outputs only what's found between
+  and including the 'fencepost' predicates start-capture and end-capture."
+  (partition-inside start-capture end-capture input))
+
+
+;;;;;;;;;;;;;;;;;;
+;; Publish Filters
+
+(defn unsuccessful-retry?
+  "Filter out any successful retries."
+  [coll]
+  (nil?
+    (first
+      (remove
+        #(nil? (re-find #"Attempt \d+ failed! Trying again in \d+ seconds..." %))
+        coll))))
+
+;;;;;;;;;;;;;;;;;;
+;; Subject Builder
+
+(defn traceback-type
+  "Extract the traceback type based on regex from a traceback."
+  [coll]
+  (first (filter #(re-find #"[\w\.]+:\s+" %) coll)))
+
+(defn subject
+  "Build the message subject from a prefix and a traceback."
+  [s coll]
+  (str s " - " (traceback-type coll)))
 
 ;;;;;;;;;;;;;;;;;;;;
 ;; Command & Control
-(defn extract-traceback [input]
-  "Given a streaming input (a log), outputs only the tracebacks."
-  (partition-inside traceback-start? traceback-end? input))
+(defn ->log!
+  "Send a message to STDOUT as a log message"
+  [sub message _]
+  (log/info (str "------------------------------------------------------------------\n"
+                 sub ":\n"
+                 message)))
 
-(defn traceback-from-file [topic subject filename]
-  "Given a filename, push the text of any tracebacks to the SNS topic."
-  (doseq
-    [traceback (extract-traceback (tail-seq filename))]
-    (let [sns-subject (str subject " - " (first (split (last traceback) #"\s")))] 
-      (sns/publish :topic-arn topic
-                  :subject sns-subject
-                  :message (join "\n" traceback))
-      (log/info (str "Traceback sent to " topic " with subject: " sns-subject)))))
+(defn ->sns!
+  "Send a message to SNS."
+  [arn sub message]
+  (sns/publish :topic-arn arn
+               :subject subject
+               :message message)
+  (log/info (str "Traceback sent to " arn " with subject: " sub)))
+
+(defn data->
+  "Based on provided info, grab tracebacks and send them to the endpoint (log or SNS)"
+  ([subject-prefix filename]
+   (data-> ->log! subject-prefix filename ""))
+  ([subject-prefix filename arn]
+   (data-> (partial ->sns! arn) subject-prefix filename ""))
+  ([out-fn subject-prefix filename _]
+   (doseq
+     [traceback (filter unsuccessful-retry? (extract-lines (tail-seq filename)))]  ;; filter for tracebacks that weren't successfully retried
+     (let [traceback (butlast (remove empty? traceback))  ;; tracebacks contain a number of unnecessary newlines and the final line is bunk
+           sub (subject subject-prefix traceback)]
+       (out-fn sub (join "\n" traceback))))))
 
 (defn -main
+  "Entrypoint
+  Requires the filename of the log to tail as the first arg."
   [& args]
   (let [topic (slack-sns-topic)
         subject (slack-sns-subject)]
     (log/info (str "Sending tracebacks to SNS Topic: " topic
                    ", Subject Prefix: " subject))
-    (traceback-from-file topic subject (first args))))
+    (data-> subject (first args) topic)))
+
+
+;;;;;;;;;;;;;;;;;;;;
+;; Helpful Dev Stuff
+(comment
+  (clojure.pprint/pprint
+    (filter unsuccessful-retry?
+      (butlast
+        (extract-lines ["Traceback (most recent call last):"
+                        "  File \"./send_status.py\", line 227, in <module>"
+                        "smtplib.SMTPDataError: (454, 'Temporary service failure')"
+                        ""
+                        "Fri Oct 21 12:15:40 UTC 2016 [skipping] report"
+                        "[skipping] Running report"]))))
+
+  (clojure.pprint/pprint
+    (filter unsuccessful-retry?
+      (butlast
+        (extract-lines ["Traceback (most recent call last):"
+                        "  File \"./send_status.py\", line 227, in <module>"
+                        "smtplib.SMTPDataError: (454, 'Temporary service failure')"
+                        ""
+                        "Attempt 1 failed! Trying again in 4 seconds..."
+                        "Fri Oct 21 12:15:40 UTC 2016 [skipping] report"
+                        "[skipping] Running report"]))))
+
+  (clojure.pprint/pprint
+    (filter unsuccessful-retry?
+      (butlast
+        (extract-lines ["Traceback (most recent call last):"
+                        "  File \"./send_status.py\", line 227, in <module>"
+                        "smtplib.SMTPDataError: (454, 'Temporary service failure')"
+                        ""
+                        "Attempt 1 failed and there are no more attempts left!"
+                        "Fri Oct 21 12:15:40 UTC 2016 [skipping] report"
+                        "[skipping] Running report"]))))
+
+  (data-> "testing" "dev-resources/test.log"))

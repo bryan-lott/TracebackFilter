@@ -2,28 +2,13 @@
   (:require [clojure.test :refer :all]
             [tracebackfilter.core :refer :all]))
 
-(def real-log ["2016-10-21 12:15:34,191 - INFO - send_status.py - starting"
-               "Traceback (most recent call last):"
+(def real-log ["Traceback (most recent call last):"
                "  File \"./send_status.py\", line 227, in <module>"
-               "    main(args, config)"
-               "  File \"./send_status.py\", line 191, in main"
-               "    send_email(config, html, args.recipients.split(','), chart_filename)"
-               "  File \"./send_status.py\", line 176, in send_email"
-               "    sender.send(message)"
-               "  File \"/usr/lib/python2.7/dist-packages/mailer.py\", line 110, in send"
-               "    self._send(server, msg)"
-               "  File \"/usr/lib/python2.7/dist-packages/mailer.py\", line 140, in _send"
-               "    server.sendmail(me, you, msg.as_string())"
-               "  File \"/usr/lib/python2.7/smtplib.py\", line 746, in sendmail"
-               "    raise SMTPDataError(code, resp)"
                "smtplib.SMTPDataError: (454, 'Temporary service failure')"
                ""
-               "\n"
-               "\r\n"
                "Attempt 1 failed! Trying again in 4 seconds..."
                "Fri Oct 21 12:15:40 UTC 2016 [skipping] report"
-               "[skipping] Running report"
-               "Running other tasks"])
+               "[skipping] Running report"])
 
 (deftest test-take-to-first
   (testing "Found a split point"
@@ -55,7 +40,7 @@
 
 (deftest test-partition-inside
   (testing "Start/stop"
-    (is (= [[true false] []] 
+    (is (= [[true false] []]
            (partition-inside true? false? [true false])))
     (is (= [[true nil false] []]
            (partition-inside true? false? [nil true nil false nil]))))
@@ -76,40 +61,91 @@
     (is (= [[true nil nil true nil false] [true nil false] []]
            (partition-inside true? false? [nil true nil nil true nil false nil false nil])))))
 
-(deftest test-traceback-start
-  (testing "True"
-    (is (true? (traceback-start? "Traceback"))))
-  (testing "False"
-    (is (false? (traceback-start? " Traceback")))
-    (is (false? (traceback-start? "traceback")))
-    (is (false? (traceback-start? "stuff and things")))))
+(deftest test-start-capture
+  (testing "Start capture"
+    (is (true? (start-capture "Traceback"))))
+  (testing "Don't start capture"
+    (is (false? (start-capture "")))
+    (is (false? (start-capture "traceback")))
+    (is (false? (start-capture " ")))
+    (is (false? (start-capture "other message")))))
 
-(deftest test-traceback-end
-  (testing "True"
-    (is (true? (traceback-end? "didn't start with a space"))))
-  (testing "False"
-    (is (false? (traceback-end? " started with a space")))
-    (is (false? (traceback-end? "psycopg2 is a tricky one to extract")))
-    (is (false? (traceback-end? "Traceback's shouldn't be nested")))
-    (is (false? (traceback-end? "DETAILs are important for context")))))
+(deftest test-end-capture
+  (testing "End capture"
+    (is (true? (end-capture "didn't start with a space or another keyword"))))
+  (testing "Don't end capture"
+    (is (false? (end-capture " starting with spaces")))
+    (is (false? (end-capture "Traceback")))
+    (is (false? (end-capture "smtplib.SMTPDataError: (454, 'Temporary service failure')")))
+    (is (false? (end-capture "DETAIL: this is an AWS style traceback with extra redshift detail")))
+    (is (false? (end-capture "")))
+    (is (false? (end-capture "Attempt 12 failed")))))
 
-(deftest test-extract-traceback
+(deftest test-extract-lines
   (testing "Traceback Exists"
     (is (= [["Traceback (most recent call last):"
              "  File \"./send_status.py\", line 227, in <module>"
-             "    main(args, config)"
-             "  File \"./send_status.py\", line 191, in main"
-             "    send_email(config, html, args.recipients.split(','), chart_filename)"
-             "  File \"./send_status.py\", line 176, in send_email"
-             "    sender.send(message)"
-             "  File \"/usr/lib/python2.7/dist-packages/mailer.py\", line 110, in send"
-             "    self._send(server, msg)"
-             "  File \"/usr/lib/python2.7/dist-packages/mailer.py\", line 140, in _send"
-             "    server.sendmail(me, you, msg.as_string())"
-             "  File \"/usr/lib/python2.7/smtplib.py\", line 746, in sendmail"
-             "    raise SMTPDataError(code, resp)"
-             "smtplib.SMTPDataError: (454, 'Temporary service failure')"] []]
-           (extract-traceback real-log))))
+             "smtplib.SMTPDataError: (454, 'Temporary service failure')"
+             ""
+             "Attempt 1 failed! Trying again in 4 seconds..."
+             "Fri Oct 21 12:15:40 UTC 2016 [skipping] report"] []]
+           (extract-lines real-log))))
   (testing "No traceback"
     (is (= [[]]
-           (extract-traceback (map str (range 10)))))))
+           (extract-lines (map str (range 10))))))
+  (testing "Successful Retry"
+    (is (= []
+           (filter unsuccessful-retry?
+                   (butlast
+                     (extract-lines ["Traceback (most recent call last):"
+                                     "  File \"./send_status.py\", line 227, in <module>"
+                                     "smtplib.SMTPDataError: (454, 'Temporary service failure')"
+                                     ""
+                                     "Attempt 1 failed! Trying again in 4 seconds..."
+                                     "Fri Oct 21 12:15:40 UTC 2016 [skipping] report"
+                                     "[skipping] Running report"]))))))
+  (testing "Unsuccessful Retry"
+    (is (= [["Traceback (most recent call last):"
+                                     "  File \"./send_status.py\", line 227, in <module>"
+                                     "smtplib.SMTPDataError: (454, 'Temporary service failure')"
+                                     ""
+                                     "Attempt 1 failed and there are no more attempts left!"
+                                     "Fri Oct 21 12:15:40 UTC 2016 [skipping] report"]]
+           (filter unsuccessful-retry?
+                   (butlast
+                     (extract-lines ["Traceback (most recent call last):"
+                                     "  File \"./send_status.py\", line 227, in <module>"
+                                     "smtplib.SMTPDataError: (454, 'Temporary service failure')"
+                                     ""
+                                     "Attempt 1 failed and there are no more attempts left!"
+                                     "Fri Oct 21 12:15:40 UTC 2016 [skipping] report"
+                                     "[skipping] Running report"])))))))
+
+(deftest test-unsuccessful-retry
+  (testing "Filter this out"
+    (is (false? (unsuccessful-retry?
+                  ["Traceback"
+                   "Other stuff Here"
+                   "Attempt 1 failed! Trying again in 4 seconds..."
+                   ""]))))
+  (testing "Don't filter this one"
+    (is (true? (unsuccessful-retry?
+                 ["Traceback"
+                  "Other stuff here"
+                  "Attempt 1 failed and there are no more attempts left!"])))))
+
+(deftest test-traceback-type
+  (testing "Extract traceback type"
+    (is (= "traceback.Thing: "
+           (traceback-type ["1" "2" "3" "traceback.Thing: "]))))
+  (testing "No traceback found"
+    (is (= nil
+           (traceback-type ["1" "2"])))))
+
+(deftest test-subject
+  (testing "Building traceback subject"
+    (is (= "Subject - traceback.Thing: "
+           (subject "Subject" ["1" "2" "3" "traceback.Thing: "]))))
+  (testing "No traceback found"
+    (is (= "Subject - "
+           (subject "Subject" ["1" "2"])))))
