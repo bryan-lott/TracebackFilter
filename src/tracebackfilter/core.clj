@@ -60,13 +60,12 @@
   "Close and reopen the provided file.
   This is to be able to follow logrotate when it switches."
   (let [offset (.getFilePointer raf)]
-    (do
-      (.close raf)
-      (let [raf (RandomAccessFile. input-filename "r")]
-        (if (> offset (.length raf))  ;; detect if the file's been truncated
-          (.seek raf 0)
-          (.seek raf offset))
-        raf))))
+    (.close raf)
+    (let [raf (RandomAccessFile. input-filename "r")]
+      (if (> offset (.length raf))  ;; detect if the file's been truncated
+        (.seek raf 0)
+        (.seek raf offset))
+      raf)))
 
 (defn raf-seq
   "Tail the provided file."
