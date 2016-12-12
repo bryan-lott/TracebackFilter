@@ -17,6 +17,19 @@
 (defn slack-sns-subject []
   (System/getenv "TBF_SNS_SUBJECT"))
 
+(defn start-fencepost []
+  (or (System/getenv "TBF_START_REGEX")
+      #"^Traceback"))
+
+(defn end-fencepost []
+  (or (System/getenv "TBF_END_REGEX")
+      #"^\s+|^Traceback|^[\w\.]+:\s+|^DETAIL|^$|^Attempt \d+ failed"))
+
+(defn skip-regex []
+  "This regex is applied after a section has been captured.  If the regex
+   exists, filter *out* the section."
+  (or (System/getenv "TBF_SKIP_REGEX")
+      #"Attempt \d+ failed! Trying again in \d+ seconds..."))
 
 ;;;;;;;;;;;;;;;;;;;;;
 ;; Sequence Functions
@@ -109,11 +122,11 @@
 
 (def start-capture
   "Start capturing data after this if it returns true."
-  (partial capture #"^Traceback" false))
+  (partial capture (start-fencepost) false))
 
 (def end-capture
   "Stop capturing data if we get a line that doesn't match this regex."
-  (partial capture #"^\s+|^Traceback|^[\w\.]+:\s+|^DETAIL|^$|^Attempt \d+ failed" true))
+  (partial capture (end-fencepost) true))
 
 (defn extract-lines [before after input]
   "Given a streaming input (a log), outputs only what's found between
