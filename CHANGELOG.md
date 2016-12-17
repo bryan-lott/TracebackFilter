@@ -1,24 +1,19 @@
 # Change Log
-All notable changes to this project will be documented in this file. This change log follows the conventions of [keepachangelog.com](http://keepachangelog.com/).
 
-## [Unreleased][unreleased]
+## [2016.12.xx][unreleased]
 ### Changed
-- Add a new arity to `make-widget-async` to provide a different widget shape.
+- Add environment vars for user configurable fenceposts:
+  - `TBF_START_REGEX`
+  - `TBF_END_REGEX`
+  - `TBF_SKIP_REGEX`
+- Reduce the size of the uberjar by removing extra amazonica modules
+- Fix subject extraction bug
+- Change versioning scheme from semantic to time-based
 
-## [0.1.1] - 2016-10-21
-### Changed
-- Documentation on how to make the widgets.
-
-### Removed
-- `make-widget-sync` - we're all async, all the time.
-
+## [2016.10.27](https://github.com/bryan-lott/TracebackFilter/releases/tag/v2016.10.27)
 ### Fixed
-- Fixed widget maker to keep working when daylight savings switches over.
+- Instead of following a single log file endlessly, TF now plays nicely with logrotate and stays on the primary log.
+- Bugs squashed
 
-## 0.1.0 - 2016-10-21
-### Added
-- Files from the new template.
-- Widget maker public API - `make-widget-sync`.
-
-[unreleased]: https://github.com/your-name/tracebackfilter/compare/0.1.1...HEAD
-[0.1.1]: https://github.com/your-name/tracebackfilter/compare/0.1.0...0.1.1
+## [2016.10.22](https://github.com/bryan-lott/TracebackFilter/releases/tag/v2016.10.22)
+### Initial Release
