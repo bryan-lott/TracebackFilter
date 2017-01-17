@@ -187,8 +187,8 @@
         subject (slack-sns-subject)]
     (cond
       (:help options) (log/info summary)
-      errors (exit 1 (join "\n" errors))
-      (empty? arguments) (exit 0 summary)
+      errors (log/error (join "\n" errors))
+      (empty? arguments) (log/error summary)
       :else (data-> subject (first arguments) topic (:before options) (:after options)))))
 
 ;;;;;;;;;;;;;;;;;;;;
