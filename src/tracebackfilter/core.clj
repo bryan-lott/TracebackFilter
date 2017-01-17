@@ -3,7 +3,9 @@
   (:require [clojure.string :refer [join starts-with? split]]
             [amazonica.aws.sns :as sns]
             [clojure.tools.cli :refer [parse-opts]]
-            [clojure.tools.logging :as log])
+            [clojure.tools.logging :as log]
+            [clj-time.core :as -time]
+            [clj-time.format :as format-time])
   (:gen-class))
 
 
@@ -135,10 +137,16 @@
 
 ;;;;;;;;;;;;;;;;;;;;
 ;; Command & Control
+(defn timestamp!
+  "Get a human readable timestamp local to the box."
+  []
+  (format-time/unparse (format-time/formatter "yyyyMMdd HH:mm:ss,SSS") (-time/now)))
+  
 (defn ->log!
   "Send a message to STDOUT as a log message"
   [sub message _]
   (log/info (str "------------------------------------------------------------------\n"
+                 (timestamp!) "\n"
                  sub ":\n"
                  message)))
 
@@ -147,7 +155,7 @@
   [arn sub message]
   (sns/publish :topic-arn arn
                :subject subject
-               :message message)
+               :message (str (timestamp!) "\n" message))
   (log/info (str "Traceback sent to " arn " with subject: " sub)))
 
 (defn data->
