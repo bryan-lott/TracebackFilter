@@ -8,58 +8,76 @@
                ""
                "Attempt 1 failed! Trying again in 4 seconds..."
                "Fri Oct 21 12:15:40 UTC 2016 [skipping] report"
-               "[skipping] Running report"])
+               "[skipping] Running report"
+               "Line 1 after"
+               "Line 2 after"
+               "Line 3 after"])
 
 (deftest test-take-to-first
   (testing "Found a split point"
     (is (= [1 1 1 1 2]
-           (take-to-first even? [1 1 1 1 2])))
+           (take-to-first 0 even? [1 1 1 1 2])))
     (is (= [1 1 2]
-           (take-to-first even? [1 1 2 1 1])))
+           (take-to-first 0 even? [1 1 2 1 1])))
     (is (= [2]
-           (take-to-first even? [2 1 1]))))
+           (take-to-first 0 even? [2 1 1]))))
   (testing "No split point"
     (is (= []
-           (take-to-first even? [])))
+           (take-to-first 0 even? [])))
     (is (= [1 1 1]
-           (take-to-first even? [1 1 1])))))
+           (take-to-first 0 even? [1 1 1]))))
+  (testing "Capture n after"
+    (is (= [1 1 1 1 2 1 1]
+           (take-to-first 2 even? [1 1 1 1 2 1 1 1 1])))))
 
 (deftest test-drop-to-first
   (testing "Drop point"
     (is (= [2 1 1]
-           (drop-to-first even? [1 1 2 1 1])))
+           (drop-to-first 0 even? [1 1 2 1 1])))
     (is (= [2 1 1]
-           (drop-to-first even? [2 1 1])))
+           (drop-to-first 0 even? [2 1 1])))
     (is (= [2]
-           (drop-to-first even? [1 1 2]))))
+           (drop-to-first 0 even? [1 1 2]))))
   (testing "No drop point"
     (is (= []
-           (drop-to-first even? [1 1 1])))
+           (drop-to-first 0 even? [1 1 1])))
     (is (= []
-           (drop-to-first even? [])))))
+           (drop-to-first 0 even? []))))
+  (testing "Capture n before"
+    (is (= [1 1 2 1 1]
+           (drop-to-first 2 even? [1 1 1 2 1 1])))))
 
 (deftest test-partition-inside
   (testing "Start/stop"
-    (is (= [[true false] []]
-           (partition-inside true? false? [true false])))
-    (is (= [[true nil false] []]
-           (partition-inside true? false? [nil true nil false nil]))))
+    (is (= [[true false]]
+           (partition-inside 0 0 true? false? [true false])))
+    (is (= [[true nil false]]
+           (partition-inside 0 0 true? false? [nil true nil false nil]))))
   (testing "Multiple start/stop"
-    (is (= [[true nil nil false] [true nil false] []]
-           (partition-inside true? false? [nil true nil nil false nil nil true nil false nil]))))
+    (is (= [[true nil nil false] [true nil false]]
+           (partition-inside 0 0 true? false? [nil true nil nil false nil nil true nil false nil]))))
   (testing "No start/stop"
-    (is (= [[]]
-           (partition-inside true? false? [nil nil nil])))
+    (is (= []
+           (partition-inside 0 0 true? false? [nil nil nil])))
     (is (= nil
-           (partition-inside true? false? []))))
+           (partition-inside 0 0 true? false? []))))
   (testing "Start no stop"
-    (is (= [[true nil nil] []]
-           (partition-inside true? false? [nil true nil nil]))))
+    (is (= [[true nil nil]]
+           (partition-inside 0 0 true? false? [nil true nil nil]))))
   (testing "Nested - these are weird..."
-    (is (= [[true nil true] [true]]
-           (partition-inside true? false? [nil true nil true])))
-    (is (= [[true nil nil true nil false] [true nil false] []]
-           (partition-inside true? false? [nil true nil nil true nil false nil false nil])))))
+    (is (= [[true nil true]]
+           (partition-inside 0 0 true? false? [nil true nil true])))
+    (is (= [[true nil nil true nil false] [true nil false]]
+           (partition-inside 0 0 true? false? [nil true nil nil true nil false nil false nil]))))
+  (testing "Capture n elements after data"
+    (is (= [[true nil false nil nil]]
+           (partition-inside 0 2 true? false? [nil nil nil nil true nil false nil nil nil]))))
+  (testing "Capture n elements before data"
+    (is (= [[nil nil true nil false]]
+           (partition-inside 2 0 true? false? [nil nil nil nil true nil false nil nil nil]))))
+  (testing "Capture n elements before, m elements after data"
+    (is (= [[nil nil true nil false nil nil]]
+           (partition-inside 2 2 true? false? [nil nil nil nil true nil false nil nil nil])))))
 
 (deftest test-start-capture
   (testing "Start capture"
@@ -88,51 +106,21 @@
              "smtplib.SMTPDataError: (454, 'Temporary service failure')"
              ""
              "Attempt 1 failed! Trying again in 4 seconds..."
-             "Fri Oct 21 12:15:40 UTC 2016 [skipping] report"] []]
-           (extract-lines real-log))))
+             "Fri Oct 21 12:15:40 UTC 2016 [skipping] report"]]
+           (extract-lines 0 0 real-log))))
   (testing "No traceback"
-    (is (= [[]]
-           (extract-lines (map str (range 10))))))
-  (testing "Successful Retry"
     (is (= []
-           (filter unsuccessful-retry?
-                   (butlast
-                     (extract-lines ["Traceback (most recent call last):"
-                                     "  File \"./send_status.py\", line 227, in <module>"
-                                     "smtplib.SMTPDataError: (454, 'Temporary service failure')"
-                                     ""
-                                     "Attempt 1 failed! Trying again in 4 seconds..."
-                                     "Fri Oct 21 12:15:40 UTC 2016 [skipping] report"
-                                     "[skipping] Running report"]))))))
-  (testing "Unsuccessful Retry"
+           (extract-lines 0 0 (map str (range 10))))))
+  (testing "Capture N elements after"
     (is (= [["Traceback (most recent call last):"
-                                     "  File \"./send_status.py\", line 227, in <module>"
-                                     "smtplib.SMTPDataError: (454, 'Temporary service failure')"
-                                     ""
-                                     "Attempt 1 failed and there are no more attempts left!"
-                                     "Fri Oct 21 12:15:40 UTC 2016 [skipping] report"]]
-           (filter unsuccessful-retry?
-                   (butlast
-                     (extract-lines ["Traceback (most recent call last):"
-                                     "  File \"./send_status.py\", line 227, in <module>"
-                                     "smtplib.SMTPDataError: (454, 'Temporary service failure')"
-                                     ""
-                                     "Attempt 1 failed and there are no more attempts left!"
-                                     "Fri Oct 21 12:15:40 UTC 2016 [skipping] report"
-                                     "[skipping] Running report"])))))))
-
-(deftest test-unsuccessful-retry
-  (testing "Filter this out"
-    (is (false? (unsuccessful-retry?
-                  ["Traceback"
-                   "Other stuff Here"
-                   "Attempt 1 failed! Trying again in 4 seconds..."
-                   ""]))))
-  (testing "Don't filter this one"
-    (is (true? (unsuccessful-retry?
-                 ["Traceback"
-                  "Other stuff here"
-                  "Attempt 1 failed and there are no more attempts left!"])))))
+             "  File \"./send_status.py\", line 227, in <module>"
+             "smtplib.SMTPDataError: (454, 'Temporary service failure')"
+             ""
+             "Attempt 1 failed! Trying again in 4 seconds..."
+             "Fri Oct 21 12:15:40 UTC 2016 [skipping] report"
+             "[skipping] Running report"
+             "Line 1 after"]]
+           (extract-lines 0 2 real-log)))))
 
 (deftest test-traceback-type
   (testing "Extract traceback type"
@@ -149,3 +137,4 @@
   (testing "No traceback found"
     (is (= "Subject - "
            (subject "Subject" ["1" "2"])))))
+

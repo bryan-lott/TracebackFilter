@@ -26,35 +26,36 @@
   and including the point at which it (pred item) returns true.
   pred must be free of side-effects.
   taken from: https://groups.google.com/forum/#!topic/clojure/Gs6UtrRSLv8"
-  [pred coll]
+  [after pred coll]
   (lazy-seq
    (when-let [s (seq coll)]
-       (if-not (pred (first s))
-         (cons (first s) (take-to-first pred (rest s)))
-         (list (first s))))))
+     (if-not (pred (first s))
+       (cons (first s) (take-to-first after pred (rest s)))
+       (flatten (list (take (inc after) s)))))))
 
 (defn drop-to-first
   "Returns a lazy sequence of successive items from coll after
   the point and including the point at which (pred item) returns true.
   pred must be free of side-effects."
-  [pred coll]
+  [before pred coll]
   (lazy-seq
     (when-let [s (seq coll)]
-      (if-not (pred (first s))
-        (drop-to-first pred (rest s))
+      (if-not (pred (nth s before true))
+        (drop-to-first before pred (rest s))
         s))))
+
 
 (defn partition-inside
   "Grabs whats between and including the pred-start and pred-stop.
   pred-start and pred-stop should not be the same predicate.
   if the data is of a 'nested' format each of the nestings will be returned."
-  [pred-start pred-stop coll]
+  [before after pred-start pred-stop coll]
   (when-let [s (seq coll)]
     (lazy-seq
-      (let [run (take-to-first pred-stop (drop-to-first pred-start s))
-            res (drop (count (take-to-first pred-start s)) s)]
-          (cons run (partition-inside pred-start pred-stop res))))))
-
+      (let [run (take-to-first after pred-stop (drop-to-first before pred-start s))
+            res (drop (count (take-to-first before pred-start s)) s)]
+        (if-not (empty? res)
+          (cons run (partition-inside before after pred-start pred-stop res)))))))
 
 ;;;;;;;;;;;;;;
 ;; File access
@@ -104,23 +105,11 @@
   "Stop capturing data if we get a line that doesn't match this regex."
   (partial capture #"^\s+|^Traceback|^[\w\.]+:\s+|^DETAIL|^$|^Attempt \d+ failed" true))
 
-(defn extract-lines [input]
+(defn extract-lines [before after input]
   "Given a streaming input (a log), outputs only what's found between
   and including the 'fencepost' predicates start-capture and end-capture."
-  (partition-inside start-capture end-capture input))
+  (partition-inside before after start-capture end-capture input))
 
-
-;;;;;;;;;;;;;;;;;;
-;; Publish Filters
-
-(defn unsuccessful-retry?
-  "Filter out any successful retries."
-  [coll]
-  (nil?
-    (first
-      (remove
-        #(nil? (re-find #"Attempt \d+ failed! Trying again in \d+ seconds..." %))
-        coll))))
 
 ;;;;;;;;;;;;;;;;;;
 ;; Subject Builder
@@ -140,11 +129,11 @@
 (defn timestamp!
   "Get a human readable timestamp local to the box."
   []
-  (format-time/unparse (format-time/formatter "yyyyMMdd HH:mm:ss,SSS") (-time/now)))
+  (format-time/unparse (format-time/formatter "yyyy-MM-dd HH:mm:ss,SSS") (-time/now)))
   
 (defn ->log!
   "Send a message to STDOUT as a log message"
-  [sub message _]
+  [sub message]
   (log/info (str "------------------------------------------------------------------\n"
                  (timestamp!) "\n"
                  sub ":\n"
@@ -160,61 +149,75 @@
 
 (defn data->
   "Based on provided info, grab tracebacks and send them to the endpoint (log or SNS)"
-  ([subject-prefix filename]
+  ([subject-prefix filename before after]  ;; useful for testing purposes, just send tracebacks to log/info
    (data-> ->log! subject-prefix filename ""))
-  ([subject-prefix filename arn]
-   (data-> (partial ->sns! arn) subject-prefix filename ""))
-  ([out-fn subject-prefix filename _]
+  ([subject-prefix filename arn before after]  ;; send tracebacks to the sns topic
+   (log/info (str "Sending tracebacks to SNS Topic: " arn
+                  ", Subject Prefix: " subject-prefix))
+   (data-> (partial ->sns! arn) subject-prefix filename before after ""))
+  ([out-fn subject-prefix filename before after _]
    (doseq
-     [traceback (filter unsuccessful-retry? (extract-lines (tail-seq filename)))]  ;; filter for tracebacks that weren't successfully retried
-     (let [traceback (butlast (remove empty? traceback))  ;; tracebacks contain a number of unnecessary newlines and the final line is bunk
+     [traceback (extract-lines before after (tail-seq filename))]  ;; filter for tracebacks that weren't successfully retried
+     (let [traceback (remove empty? traceback)  ;; tracebacks contain a number of unnecessary newlines
            sub (subject subject-prefix traceback)]
        (out-fn sub (join "\n" traceback))))))
+
+
+(def cli-options
+  [["-a" "--after LINES" "number of lines to capture after the traceback"
+    :id :after
+    :default 0
+    :parse-fn #(Integer/parseInt %)]
+   ["-b" "--before LINES" "number of lines to cpature before the traceback"
+    :id :before
+    :default 0
+    :parse-fn #(Integer/parseInt %)]
+   ["-h" "--help"]])
+
 
 (defn -main
   "Entrypoint
   Requires the filename of the log to tail as the first arg."
   [& args]
   (let [topic (slack-sns-topic)
-        subject (slack-sns-subject)]
-    (log/info (str "Sending tracebacks to SNS Topic: " topic
-                   ", Subject Prefix: " subject))
-    (data-> subject (first args) topic)))
+        subject (slack-sns-subject)])
 
+  (let [{:keys [options arguments errors summary]} (parse-opts args cli-options)
+        topic (slack-sns-topic)
+        subject (slack-sns-subject)]
+    (cond
+      (:help options) (log/info summary)
+      errors (exit 1 (join "\n" errors))
+      (empty? arguments) (exit 0 summary)
+      :else (data-> subject (first arguments) topic (:before options) (:after options)))))
 
 ;;;;;;;;;;;;;;;;;;;;
 ;; Helpful Dev Stuff
 (comment
   (clojure.pprint/pprint
-    (filter unsuccessful-retry?
-      (butlast
-        (extract-lines ["Traceback (most recent call last):"
+    (extract-lines 0 0 ["Traceback (most recent call last):"
                         "  File \"./send_status.py\", line 227, in <module>"
                         "smtplib.SMTPDataError: (454, 'Temporary service failure')"
                         ""
                         "Fri Oct 21 12:15:40 UTC 2016 [skipping] report"
-                        "[skipping] Running report"]))))
+                        "[skipping] Running report"]))
 
   (clojure.pprint/pprint
-    (filter unsuccessful-retry?
-      (butlast
-        (extract-lines ["Traceback (most recent call last):"
+    (extract-lines 0 0 ["Traceback (most recent call last):"
                         "  File \"./send_status.py\", line 227, in <module>"
                         "smtplib.SMTPDataError: (454, 'Temporary service failure')"
                         ""
                         "Attempt 1 failed! Trying again in 4 seconds..."
                         "Fri Oct 21 12:15:40 UTC 2016 [skipping] report"
-                        "[skipping] Running report"]))))
+                        "[skipping] Running report"]))
 
   (clojure.pprint/pprint
-    (filter unsuccessful-retry?
-      (butlast
-        (extract-lines ["Traceback (most recent call last):"
+    (extract-lines 0 0 ["Traceback (most recent call last):"
                         "  File \"./send_status.py\", line 227, in <module>"
                         "smtplib.SMTPDataError: (454, 'Temporary service failure')"
                         ""
                         "Attempt 1 failed and there are no more attempts left!"
                         "Fri Oct 21 12:15:40 UTC 2016 [skipping] report"
-                        "[skipping] Running report"]))))
+                        "[skipping] Running report"]))
 
   (data-> "testing" "dev-resources/test.log"))
