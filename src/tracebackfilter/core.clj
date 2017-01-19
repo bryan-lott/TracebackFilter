@@ -21,18 +21,6 @@
 ;;;;;;;;;;;;;;;;;;;;;
 ;; Sequence Functions
 
-(defn take-to-first
-  "Returns a lazy sequence of successive items from coll up to
-  and including the point at which it (pred item) returns true.
-  pred must be free of side-effects.
-  taken from: https://groups.google.com/forum/#!topic/clojure/Gs6UtrRSLv8"
-  [after pred coll]
-  (lazy-seq
-   (when-let [s (seq coll)]
-     (if-not (pred (first s))
-       (cons (first s) (take-to-first after pred (rest s)))
-       (flatten (list (take (inc after) s)))))))
-
 (defn drop-to-first
   "Returns a lazy sequence of successive items from coll after
   the point and including the point at which (pred item) returns true.
@@ -40,9 +28,28 @@
   [before pred coll]
   (lazy-seq
     (when-let [s (seq coll)]
-      (if-not (pred (nth s before true))
-        (drop-to-first before pred (rest s))
+      (if-not (pred (nth s before nil))  ;; acts as a "lookahead" for retaining the before lines
+        (drop-to-first before pred (rest s))  ;; move one ahead
         s))))
+
+(defn take-to-first
+  "Returns a lazy sequence of successive items from coll up to
+  and including the point at which it (pred item) returns true.
+  pred must be free of side-effects.
+  taken from: https://groups.google.com/forum/#!topic/clojure/Gs6UtrRSLv8"
+  [offset after pred coll]
+  (when-let [s (seq coll)]
+    (if (> offset 0)
+      (let [o (take offset s)
+            s (drop offset s)
+            t (first s)]
+        (if-not (pred t)
+          (concat o [t] (take-to-first 0 after pred (rest s)))
+          (take (inc after) s)))
+      (let [t (first s)]
+        (if-not (pred t)
+          (concat [t] (take-to-first 0 after pred (rest s)))
+          (take (inc after) s))))))
 
 
 (defn partition-inside
@@ -52,10 +59,11 @@
   [before after pred-start pred-stop coll]
   (when-let [s (seq coll)]
     (lazy-seq
-      (let [run (take-to-first after pred-stop (drop-to-first before pred-start s))
-            res (drop (count (take-to-first before pred-start s)) s)]
-        (if-not (empty? res)
-          (cons run (partition-inside before after pred-start pred-stop res)))))))
+      (let [captured (->> s
+                         (drop-to-first before pred-start)
+                         (take-to-first before after pred-stop))
+            res (drop (count (take-to-first before before pred-start s)) s)]
+        (remove nil? (cons captured (partition-inside before after pred-start pred-stop res)))))))
 
 ;;;;;;;;;;;;;;
 ;; File access
@@ -93,9 +101,11 @@
   "Given a regex, exclude or include based on value of negative
   and whether the regex returns a value after being run over s."
   [regex negative s]
-  (if negative
-    (nil? (re-find regex s))
-    (not (nil? (re-find regex s)))))
+  (if-not (nil? s)
+    (if negative
+      (nil? (re-find regex s))
+      (not (nil? (re-find regex s))))
+    false))
 
 (def start-capture
   "Start capturing data after this if it returns true."
@@ -110,14 +120,13 @@
   and including the 'fencepost' predicates start-capture and end-capture."
   (partition-inside before after start-capture end-capture input))
 
-
 ;;;;;;;;;;;;;;;;;;
 ;; Subject Builder
 
 (defn traceback-type
   "Extract the traceback type based on regex from a traceback."
   [coll]
-  (first (filter #(re-find #"[\w\.]+:\s+" %) coll)))
+  (first (filter #(re-find #"^[a-zA-Z_.]+:\s+" %) coll)))
 
 (defn subject
   "Build the message subject from a prefix and a traceback."
@@ -143,21 +152,21 @@
   "Send a message to SNS."
   [arn sub message]
   (sns/publish :topic-arn arn
-               :subject subject
+               :subject sub
                :message (str (timestamp!) "\n" message))
   (log/info (str "Traceback sent to " arn " with subject: " sub)))
 
 (defn data->
   "Based on provided info, grab tracebacks and send them to the endpoint (log or SNS)"
   ([subject-prefix filename before after]  ;; useful for testing purposes, just send tracebacks to log/info
-   (data-> ->log! subject-prefix filename ""))
+   (data-> ->log! subject-prefix filename before after ""))
   ([subject-prefix filename arn before after]  ;; send tracebacks to the sns topic
    (log/info (str "Sending tracebacks to SNS Topic: " arn
                   ", Subject Prefix: " subject-prefix))
    (data-> (partial ->sns! arn) subject-prefix filename before after ""))
   ([out-fn subject-prefix filename before after _]
    (doseq
-     [traceback (extract-lines before after (tail-seq filename))]  ;; filter for tracebacks that weren't successfully retried
+     [traceback (extract-lines before after (tail-seq filename))]
      (let [traceback (remove empty? traceback)  ;; tracebacks contain a number of unnecessary newlines
            sub (subject subject-prefix traceback)]
        (out-fn sub (join "\n" traceback))))))
@@ -220,4 +229,4 @@
                         "Fri Oct 21 12:15:40 UTC 2016 [skipping] report"
                         "[skipping] Running report"]))
 
-  (data-> "testing" "dev-resources/test.log"))
+  (data-> "testing" "dev-resources/test.log" 2 2))

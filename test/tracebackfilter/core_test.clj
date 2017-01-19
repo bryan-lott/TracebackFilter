@@ -2,7 +2,10 @@
   (:require [clojure.test :refer :all]
             [tracebackfilter.core :refer :all]))
 
-(def real-log ["Traceback (most recent call last):"
+(def real-log ["Line 1 before"
+               "Line 2 before"
+               "Line 3 before"
+               "Traceback (most recent call last):"
                "  File \"./send_status.py\", line 227, in <module>"
                "smtplib.SMTPDataError: (454, 'Temporary service failure')"
                ""
@@ -16,19 +19,17 @@
 (deftest test-take-to-first
   (testing "Found a split point"
     (is (= [1 1 1 1 2]
-           (take-to-first 0 even? [1 1 1 1 2])))
+           (take-to-first 0 0 even? [1 1 1 1 2])))
     (is (= [1 1 2]
-           (take-to-first 0 even? [1 1 2 1 1])))
+           (take-to-first 0 0 even? [1 1 2 1 1])))
     (is (= [2]
-           (take-to-first 0 even? [2 1 1]))))
+           (take-to-first 0 0 even? [2 1 1]))))
   (testing "No split point"
-    (is (= []
-           (take-to-first 0 even? [])))
     (is (= [1 1 1]
-           (take-to-first 0 even? [1 1 1]))))
+           (take-to-first 0 0 even? [1 1 1]))))
   (testing "Capture n after"
     (is (= [1 1 1 1 2 1 1]
-           (take-to-first 2 even? [1 1 1 1 2 1 1 1 1])))))
+           (take-to-first 0 2 even? [1 1 1 1 2 1 1 1 1])))))
 
 (deftest test-drop-to-first
   (testing "Drop point"
@@ -45,7 +46,11 @@
            (drop-to-first 0 even? []))))
   (testing "Capture n before"
     (is (= [1 1 2 1 1]
-           (drop-to-first 2 even? [1 1 1 2 1 1])))))
+           (drop-to-first 2 even? [1 1 1 2 1 1])))
+    (is (= [1 2 1 1]
+           (drop-to-first 1 even? [1 1 1 2 1 1])))
+    (is (= [1 1 1 2 1 1]
+           (drop-to-first 3 even? [1 1 1 2 1 1])))))
 
 (deftest test-partition-inside
   (testing "Start/stop"
@@ -65,19 +70,22 @@
     (is (= [[true nil nil]]
            (partition-inside 0 0 true? false? [nil true nil nil]))))
   (testing "Nested - these are weird..."
-    (is (= [[true nil true]]
-           (partition-inside 0 0 true? false? [nil true nil true])))
+    (is (= [[true nil true false] [true false]]
+           (partition-inside 0 0 true? false? [nil true nil true false false])));])))
     (is (= [[true nil nil true nil false] [true nil false]]
            (partition-inside 0 0 true? false? [nil true nil nil true nil false nil false nil]))))
   (testing "Capture n elements after data"
     (is (= [[true nil false nil nil]]
            (partition-inside 0 2 true? false? [nil nil nil nil true nil false nil nil nil]))))
+
   (testing "Capture n elements before data"
     (is (= [[nil nil true nil false]]
            (partition-inside 2 0 true? false? [nil nil nil nil true nil false nil nil nil]))))
   (testing "Capture n elements before, m elements after data"
     (is (= [[nil nil true nil false nil nil]]
-           (partition-inside 2 2 true? false? [nil nil nil nil true nil false nil nil nil])))))
+           (partition-inside 2 2 true? false? [nil nil nil nil true nil false nil nil nil])))
+    (is (= [[nil true nil false nil nil]]
+           (partition-inside 1 2 true? false? [nil nil nil nil true nil false nil nil nil])))))
 
 (deftest test-start-capture
   (testing "Start capture"
@@ -120,7 +128,29 @@
              "Fri Oct 21 12:15:40 UTC 2016 [skipping] report"
              "[skipping] Running report"
              "Line 1 after"]]
-           (extract-lines 0 2 real-log)))))
+           (extract-lines 0 2 real-log))))
+  (testing "Capture N elements before"
+    (is (= [["Line 2 before"
+             "Line 3 before"
+             "Traceback (most recent call last):"
+             "  File \"./send_status.py\", line 227, in <module>"
+             "smtplib.SMTPDataError: (454, 'Temporary service failure')"
+             ""
+             "Attempt 1 failed! Trying again in 4 seconds..."
+             "Fri Oct 21 12:15:40 UTC 2016 [skipping] report"]]
+           (extract-lines 2 0 real-log))))
+  (testing "Capture N elements before and after"
+    (is (= [["Line 2 before"
+             "Line 3 before"
+             "Traceback (most recent call last):"
+             "  File \"./send_status.py\", line 227, in <module>"
+             "smtplib.SMTPDataError: (454, 'Temporary service failure')"
+             ""
+             "Attempt 1 failed! Trying again in 4 seconds..."
+             "Fri Oct 21 12:15:40 UTC 2016 [skipping] report"
+             "[skipping] Running report"
+             "Line 1 after"]]
+           (extract-lines 2 2 real-log)))))
 
 (deftest test-traceback-type
   (testing "Extract traceback type"
@@ -138,3 +168,19 @@
     (is (= "Subject - "
            (subject "Subject" ["1" "2"])))))
 
+(deftest test-traceback-type
+  (testing "Subject exists"
+    (is (= "ConnectionClosedError: Connection was closed before we received a valid response from endpoint URL: \"https://s3bucket/data.tsv?partNumber=85&uploadId=some-base-64-encoded-string\"."
+           (traceback-type ["Lines before"
+                            "more lines before"
+                            "ConnectionClosedError: Connection was closed before we received a valid response from endpoint URL: \"https://s3bucket/data.tsv?partNumber=85&uploadId=some-base-64-encoded-string\"."
+                            "Lines after"
+                            "More lines after"]))))
+  (testing "Only grab the first"
+    (is (= "ConnectionClosedError: Connection was closed before we received a valid response from endpoint URL: \"https://s3bucket/data.tsv?partNumber=85&uploadId=some-base-64-encoded-string\"."
+           (traceback-type ["Lines before"
+                            "more lines before"
+                            "ConnectionClosedError: Connection was closed before we received a valid response from endpoint URL: \"https://s3bucket/data.tsv?partNumber=85&uploadId=some-base-64-encoded-string\"."
+                            "psycopg2.DatabaseError: SSL SYSCALL error: EOF detected"
+                            "Lines after"
+                            "More lines after"])))))
