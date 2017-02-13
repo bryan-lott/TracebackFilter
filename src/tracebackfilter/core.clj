@@ -139,7 +139,7 @@
   "Get a human readable timestamp local to the box."
   []
   (format-time/unparse (format-time/formatter "yyyy-MM-dd HH:mm:ss,SSS") (-time/now)))
-  
+
 (defn ->log!
   "Send a message to STDOUT as a log message"
   [sub message]
@@ -198,7 +198,7 @@
       (:help options) (log/info summary)
       errors (log/error (join "\n" errors))
       (empty? arguments) (log/error summary)
-      :else (data-> subject (first arguments) topic (:before options) (:after options)))))
+      :else (pmap #(data-> (str subject " (" %1 ")") %1 topic (:before options) (:after options)) arguments))))
 
 ;;;;;;;;;;;;;;;;;;;;
 ;; Helpful Dev Stuff
