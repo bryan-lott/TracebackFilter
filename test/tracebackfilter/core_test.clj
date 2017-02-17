@@ -163,7 +163,9 @@
 (deftest test-subject
   (testing "Building traceback subject"
     (is (= "Subject - traceback.Thing: "
-           (subject "Subject" ["1" "2" "3" "traceback.Thing: "]))))
+           (subject "Subject" ["1" "2" "3" "traceback.Thing: "])))
+    (is (= "Subject - traceback: "
+           (subject "Subject" ["1" "2" "3" "traceback: "]))))
   (testing "No traceback found"
     (is (= "Subject - "
            (subject "Subject" ["1" "2"])))))
