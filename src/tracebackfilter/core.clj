@@ -11,25 +11,27 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Environment Variable Configs
-(defn slack-sns-topic []
+(defn slack-sns-topic
+  "Get the AWS SNS Topic to send messages to."
+  []
   (System/getenv "TBF_SNS_TOPIC"))
 
-(defn slack-sns-subject []
+(defn slack-sns-subject
+  "Get the SNS subject prefix to prepend to all messages."
+  []
   (System/getenv "TBF_SNS_SUBJECT"))
 
-(defn start-fencepost []
+(defn start-fencepost
+  "Get the regex to start grabbing messages with."
+  []
   (or (System/getenv "TBF_START_REGEX")
       #"^Traceback"))
 
-(defn end-fencepost []
+(defn end-fencepost
+  "Get the regex to stop grabbing a message with."
+  []
   (or (System/getenv "TBF_END_REGEX")
       #"^\s+|^Traceback|^[\w\.]+:\s+|^DETAIL|^$|^Attempt \d+ failed"))
-
-(defn skip-regex []
-  "This regex is applied after a section has been captured.  If the regex
-   exists, filter *out* the section."
-  (or (System/getenv "TBF_SKIP_REGEX")
-      #"Attempt \d+ failed! Trying again in \d+ seconds..."))
 
 ;;;;;;;;;;;;;;;;;;;;;
 ;; Sequence Functions
@@ -52,7 +54,7 @@
   taken from: https://groups.google.com/forum/#!topic/clojure/Gs6UtrRSLv8"
   [offset after pred coll]
   (when-let [s (seq coll)]
-    (if (> offset 0)
+    (if (pos? offset)
       (let [o (take offset s)
             s (drop offset s)
             t (first s)]
@@ -80,9 +82,10 @@
 
 ;;;;;;;;;;;;;;
 ;; File access
-(defn reopen [input-filename raf]
+(defn reopen
   "Close and reopen the provided file.
   This is to be able to follow logrotate when it switches."
+  [input-filename raf]
   (let [offset (.getFilePointer raf)]
     (.close raf)
     (let [raf (RandomAccessFile. input-filename "r")]
@@ -128,9 +131,10 @@
   "Stop capturing data if we get a line that doesn't match this regex."
   (partial capture (end-fencepost) true))
 
-(defn extract-lines [before after input]
+(defn extract-lines
   "Given a streaming input (a log), outputs only what's found between
   and including the 'fencepost' predicates start-capture and end-capture."
+  [before after input]
   (partition-inside before after start-capture end-capture input))
 
 ;;;;;;;;;;;;;;;;;;
