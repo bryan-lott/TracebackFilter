@@ -190,6 +190,7 @@
 
 
 (def cli-options
+  "Define the CLI options avaliable."
   [["-a" "--after LINES" "number of lines to capture after the traceback"
     :id :after
     :default 0
