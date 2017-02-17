@@ -1,7 +1,0 @@
-(clojure.repl/dir tracebackfilter.core)
-(clojure.repl/dir 'tracebackfilter.core)
-*ns*
-(in-ns 'clojure.core)
-(clojure.repl/dir 'tracebackfilter.core)
-(clojure.repl/dir tracebackfilter.core)
-exit
