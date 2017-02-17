@@ -33,6 +33,10 @@ If, in the -v argument you mapped /log/specialfolder:/log and wanted to tail /lo
   * Type: integer
   * Purpose: Define the number of log lines after a traceback to include.
   * Default: 0
+* `--disable-start-message`
+  * Type: flag/boolean
+  * Purpose: Disable the inital sending of "Now tracking the following logfiles:..."
+  * Default false
 
 ## Additional Environment Variables
 

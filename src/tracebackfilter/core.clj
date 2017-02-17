@@ -177,7 +177,7 @@
   "Based on provided info, grab tracebacks and send them to the endpoint (log or SNS)"
   ([subject-prefix filename before after]  ;; useful for testing purposes, just send tracebacks to log/info
    (data-> ->log! subject-prefix filename before after ""))
-  ([subject-prefix filename arn before after]  ;; send tracebacks to the sns topic
+  ([subject-prefix filename arn before after]  ;; !!primary use-case!! send tracebacks to the sns topic
    (log/info (str "Sending tracebacks to SNS Topic: " arn
                   ", Subject Prefix: " subject-prefix))
    (data-> (partial ->sns! arn) subject-prefix filename before after ""))
@@ -190,6 +190,7 @@
 
 
 (def cli-options
+  "Define the CLI options avaliable."
   [["-a" "--after LINES" "number of lines to capture after the traceback"
     :id :after
     :default 0
@@ -198,12 +199,23 @@
     :id :before
     :default 0
     :parse-fn #(Integer/parseInt %)]
+   ["-d" "--disable-start-message" "Disable the inital posting to SNS of the files being tracked."
+    :id :disable-start-message
+    :default false]
    ["-h" "--help"]])
+
+
+(defn main
+  "Entrypoint for primary logic."
+  [topic subject files-to-track {:keys [after before disable-start-message]}]
+  (if (not disable-start-message)
+    (->sns! topic "Tracebackfilter is alive!" (str "Now tracking the following files:\n" (join "\n" files-to-track))))
+  (pmap #(data-> (str subject " (" %1 ")") %1 topic before after) files-to-track))
 
 
 (defn -main
   "Entrypoint
-  Requires the filename of the log to tail as the first arg."
+  Handles the logic for parsing and dealing with CLI args."
   [& args]
   (let [topic (slack-sns-topic)
         subject (slack-sns-subject)])
@@ -215,35 +227,5 @@
       (:help options) (log/info summary)
       errors (log/error (join "\n" errors))
       (empty? arguments) (log/error summary)
-      :else (pmap #(data-> (str subject " (" %1 ")") %1 topic (:before options) (:after options)) arguments))))
+      :else (main topic subject arguments options))))
 
-;;;;;;;;;;;;;;;;;;;;
-;; Helpful Dev Stuff
-(comment
-  (clojure.pprint/pprint
-    (extract-lines 0 0 ["Traceback (most recent call last):"
-                        "  File \"./send_status.py\", line 227, in <module>"
-                        "smtplib.SMTPDataError: (454, 'Temporary service failure')"
-                        ""
-                        "Fri Oct 21 12:15:40 UTC 2016 [skipping] report"
-                        "[skipping] Running report"]))
-
-  (clojure.pprint/pprint
-    (extract-lines 0 0 ["Traceback (most recent call last):"
-                        "  File \"./send_status.py\", line 227, in <module>"
-                        "smtplib.SMTPDataError: (454, 'Temporary service failure')"
-                        ""
-                        "Attempt 1 failed! Trying again in 4 seconds..."
-                        "Fri Oct 21 12:15:40 UTC 2016 [skipping] report"
-                        "[skipping] Running report"]))
-
-  (clojure.pprint/pprint
-    (extract-lines 0 0 ["Traceback (most recent call last):"
-                        "  File \"./send_status.py\", line 227, in <module>"
-                        "smtplib.SMTPDataError: (454, 'Temporary service failure')"
-                        ""
-                        "Attempt 1 failed and there are no more attempts left!"
-                        "Fri Oct 21 12:15:40 UTC 2016 [skipping] report"
-                        "[skipping] Running report"]))
-
-  (data-> "testing" "dev-resources/test.log" 2 2))
