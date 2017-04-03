@@ -5,7 +5,8 @@
             [clojure.tools.cli :refer [parse-opts]]
             [clojure.tools.logging :as log]
             [clj-time.core :as -time]
-            [clj-time.format :as format-time])
+            [clj-time.format :as format-time]
+            [tracebackfilter.logwriter :as test-log])
   (:gen-class))
 
 
@@ -79,6 +80,21 @@
                          (take-to-first before after pred-stop))
             res (drop (count (take-to-first before before pred-start s)) s)]
         (remove nil? (cons captured (partition-inside before after pred-start pred-stop res)))))))
+
+(defn tb-filter
+  "Stateful predicate function, determines based on the state of emit? and the line whether to return true/false."
+  [emit? pred-start pred-stop line]
+  (cond
+    (starts-with? line "Traceback ") (reset! emit? true)
+    (starts-with? line "Exception: ") (do (reset! emit? false) true)  ;; even though we're switching out, still emit the line
+    @emit? true))
+
+(defn test-filter
+  "Filters out anything that's not betwen pred-start and pred-stop"
+  [pred-start pred-stop coll]
+  ;; TODO: reimplement before/after
+  (let [emit? (atom false)]
+    (filter (partial tb-filter emit? pred-start pred-stop) coll)))
 
 ;;;;;;;;;;;;;;
 ;; File access

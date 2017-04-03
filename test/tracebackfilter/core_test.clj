@@ -64,8 +64,7 @@
   (testing "No start/stop"
     (is (= []
            (partition-inside 0 0 true? false? [nil nil nil])))
-    (is (= nil
-           (partition-inside 0 0 true? false? []))))
+    (is (nil? (partition-inside 0 0 true? false? []))))
   (testing "Start no stop"
     (is (= [[true nil nil]]
            (partition-inside 0 0 true? false? [nil true nil nil]))))
@@ -157,8 +156,7 @@
     (is (= "traceback.Thing: "
            (traceback-type ["1" "2" "3" "traceback.Thing: "]))))
   (testing "No traceback found"
-    (is (= nil
-           (traceback-type ["1" "2"])))))
+    (is (nil? (traceback-type ["1" "2"])))))
 
 (deftest test-subject
   (testing "Building traceback subject"
