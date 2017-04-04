@@ -88,18 +88,30 @@
 
 (deftest test-fence-pred
   (testing "truth table of emit? pred-start pred-stop"
-    (is (false? (fence-pred (atom false) true? false? nil)))
-    (is (false? (fence-pred (atom false) true? false? false)))
-    (is (true? (fence-pred (atom false) true? false? true)))
-    (is (true? (fence-pred (atom false) true? true? true)))
-    (is (true? (fence-pred (atom true) true? false? nil)))
-    (is (true? (fence-pred (atom true) true? false? false)))
-    (is (true? (fence-pred (atom true) true? false? true)))
-    (is (true? (fence-pred (atom true) true? true? true)))))
+    (is (false? (fence-pred (atom 0) true? false? nil)))
+    (is (false? (fence-pred (atom 0) true? false? false)))
+    (is (true? (fence-pred (atom 0) true? false? true)))
+    (is (true? (fence-pred (atom 0) true? true? true)))
+    (is (true? (fence-pred (atom 1) true? false? nil)))
+    (is (true? (fence-pred (atom 1) true? false? false)))
+    (is (true? (fence-pred (atom 1) true? false? true)))
+    (is (true? (fence-pred (atom 1) true? true? true)))))
 
 (deftest test-fence-filter
-  (testing "TODO!!! - write tests for fence-filter"
-    (is (true? false))))
+  (testing "happy path"
+    (is (= [true nil false]
+           (fence-filter true? false? [nil true nil false nil])))
+    (is (= []
+           (fence-filter true? false? [nil nil nil false nil])))
+    (is (= [true nil]
+           (fence-filter true? false? [nil true nil])))
+    (is (= []
+           (fence-filter true? false? []))))
+  (testing "nested"
+    (is (= [true true nil false false]
+           (fence-filter true? false? [nil true true nil false false nil])))
+    (is (= [true nil true nil false nil false]
+           (fence-filter true? false? [nil true nil true nil false nil false])))))
 
 (deftest test-start-capture
   (testing "Start capture"
@@ -123,47 +135,47 @@
 
 (deftest test-extract-lines
   (testing "Traceback Exists"
-    (is (= [["Traceback (most recent call last):"
-             "  File \"./send_status.py\", line 227, in <module>"
-             "smtplib.SMTPDataError: (454, 'Temporary service failure')"
-             ""
-             "Attempt 1 failed! Trying again in 4 seconds..."
-             "Fri Oct 21 12:15:40 UTC 2016 [skipping] report"]]
+    (is (= ["Traceback (most recent call last):"
+            "  File \"./send_status.py\", line 227, in <module>"
+            "smtplib.SMTPDataError: (454, 'Temporary service failure')"
+            ""
+            "Attempt 1 failed! Trying again in 4 seconds..."
+            "Fri Oct 21 12:15:40 UTC 2016 [skipping] report"]
            (extract-lines 0 0 real-log))))
   (testing "No traceback"
     (is (= []
            (extract-lines 0 0 (map str (range 10))))))
   (testing "Capture N elements after"
-    (is (= [["Traceback (most recent call last):"
-             "  File \"./send_status.py\", line 227, in <module>"
-             "smtplib.SMTPDataError: (454, 'Temporary service failure')"
-             ""
-             "Attempt 1 failed! Trying again in 4 seconds..."
-             "Fri Oct 21 12:15:40 UTC 2016 [skipping] report"
-             "[skipping] Running report"
-             "Line 1 after"]]
+    (is (= ["Traceback (most recent call last):"
+            "  File \"./send_status.py\", line 227, in <module>"
+            "smtplib.SMTPDataError: (454, 'Temporary service failure')"
+            ""
+            "Attempt 1 failed! Trying again in 4 seconds..."
+            "Fri Oct 21 12:15:40 UTC 2016 [skipping] report"
+            "[skipping] Running report"
+            "Line 1 after"]
            (extract-lines 0 2 real-log))))
   (testing "Capture N elements before"
-    (is (= [["Line 2 before"
-             "Line 3 before"
-             "Traceback (most recent call last):"
-             "  File \"./send_status.py\", line 227, in <module>"
-             "smtplib.SMTPDataError: (454, 'Temporary service failure')"
-             ""
-             "Attempt 1 failed! Trying again in 4 seconds..."
-             "Fri Oct 21 12:15:40 UTC 2016 [skipping] report"]]
+    (is (= ["Line 2 before"
+            "Line 3 before"
+            "Traceback (most recent call last):"
+            "  File \"./send_status.py\", line 227, in <module>"
+            "smtplib.SMTPDataError: (454, 'Temporary service failure')"
+            ""
+            "Attempt 1 failed! Trying again in 4 seconds..."
+            "Fri Oct 21 12:15:40 UTC 2016 [skipping] report"]
            (extract-lines 2 0 real-log))))
   (testing "Capture N elements before and after"
-    (is (= [["Line 2 before"
-             "Line 3 before"
-             "Traceback (most recent call last):"
-             "  File \"./send_status.py\", line 227, in <module>"
-             "smtplib.SMTPDataError: (454, 'Temporary service failure')"
-             ""
-             "Attempt 1 failed! Trying again in 4 seconds..."
-             "Fri Oct 21 12:15:40 UTC 2016 [skipping] report"
-             "[skipping] Running report"
-             "Line 1 after"]]
+    (is (= ["Line 2 before"
+            "Line 3 before"
+            "Traceback (most recent call last):"
+            "  File \"./send_status.py\", line 227, in <module>"
+            "smtplib.SMTPDataError: (454, 'Temporary service failure')"
+            ""
+            "Attempt 1 failed! Trying again in 4 seconds..."
+            "Fri Oct 21 12:15:40 UTC 2016 [skipping] report"
+            "[skipping] Running report"
+            "Line 1 after"]
            (extract-lines 2 2 real-log)))))
 
 (deftest test-traceback-type

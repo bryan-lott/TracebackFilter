@@ -81,21 +81,42 @@
             res (drop (count (take-to-first before before pred-start s)) s)]
         (remove nil? (cons captured (partition-inside before after pred-start pred-stop res)))))))
 
+;; (defn cache-before-after
+;;   "Provides a caching mechanism for the lines before/after the fenceposts."
+;;   [n-before n-after pred-start pred-stop coll]
+;;   (let [start-count (atom 0)
+;;         pred (partial fence-pred start-count pred-start pred-stop)]))
+
+;; (let [before 2
+;;       after 3
+;;       n (+ 1 before after)]
+;;   (partition n 1 [0 1 2 3 4 5 6 7 8 9 10]))
+
+
+
+
+
 (defn fence-pred
   "Stateful predicate function, determines based on the state of emit? and the line whether to return true/false."
-  [emit? pred-start pred-stop line]
+  [start-count pred-start pred-stop line]
   (cond
-    (pred-start line) (reset! emit? true)
-    (and @emit? (pred-stop line)) (do (reset! emit? false) true)  ;; even though we're switching out, still emit the line
-    @emit? true
+    (pred-start line) (do (swap! start-count inc) true)
+    (and (pos? @start-count) (pred-stop line)) (do (swap! start-count dec) true)  ;; even though we're switching out, still emit the line
+    (pos? @start-count) true
     :else false))
 
 (defn fence-filter
   "Filters out anything that's not betwen pred-start and pred-stop"
   [pred-start pred-stop coll]
   ;; TODO: reimplement before/after
-  (let [emit? (atom false)]
-    (filter (partial fence-filter emit? pred-start pred-stop) coll)))
+  (let [start-count (atom 0)]
+    (filter (partial fence-pred start-count pred-start pred-stop) coll)))
+
+
+
+
+
+
 
 ;;;;;;;;;;;;;;
 ;; File access
@@ -152,7 +173,8 @@
   "Given a streaming input (a log), outputs only what's found between
   and including the 'fencepost' predicates start-capture and end-capture."
   [before after input]
-  (partition-inside before after start-capture end-capture input))
+  (fence-filter start-capture end-capture input))
+;;   (partition-inside before after start-capture end-capture input))
 
 ;;;;;;;;;;;;;;;;;;
 ;; Subject Builder
