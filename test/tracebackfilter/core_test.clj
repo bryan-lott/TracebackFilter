@@ -86,6 +86,21 @@
     (is (= [[nil true nil false nil nil]]
            (partition-inside 1 2 true? false? [nil nil nil nil true nil false nil nil nil])))))
 
+(deftest test-fence-pred
+  (testing "truth table of emit? pred-start pred-stop"
+    (is (false? (fence-pred (atom false) true? false? nil)))
+    (is (false? (fence-pred (atom false) true? false? false)))
+    (is (true? (fence-pred (atom false) true? false? true)))
+    (is (true? (fence-pred (atom false) true? true? true)))
+    (is (true? (fence-pred (atom true) true? false? nil)))
+    (is (true? (fence-pred (atom true) true? false? false)))
+    (is (true? (fence-pred (atom true) true? false? true)))
+    (is (true? (fence-pred (atom true) true? true? true)))))
+
+(deftest test-fence-filter
+  (testing "TODO!!! - write tests for fence-filter"
+    (is (true? false))))
+
 (deftest test-start-capture
   (testing "Start capture"
     (is (true? (start-capture "Traceback"))))

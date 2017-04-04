@@ -81,20 +81,21 @@
             res (drop (count (take-to-first before before pred-start s)) s)]
         (remove nil? (cons captured (partition-inside before after pred-start pred-stop res)))))))
 
-(defn tb-filter
+(defn fence-pred
   "Stateful predicate function, determines based on the state of emit? and the line whether to return true/false."
   [emit? pred-start pred-stop line]
   (cond
-    (starts-with? line "Traceback ") (reset! emit? true)
-    (starts-with? line "Exception: ") (do (reset! emit? false) true)  ;; even though we're switching out, still emit the line
-    @emit? true))
+    (pred-start line) (reset! emit? true)
+    (and @emit? (pred-stop line)) (do (reset! emit? false) true)  ;; even though we're switching out, still emit the line
+    @emit? true
+    :else false))
 
-(defn test-filter
+(defn fence-filter
   "Filters out anything that's not betwen pred-start and pred-stop"
   [pred-start pred-stop coll]
   ;; TODO: reimplement before/after
   (let [emit? (atom false)]
-    (filter (partial tb-filter emit? pred-start pred-stop) coll)))
+    (filter (partial fence-filter emit? pred-start pred-stop) coll)))
 
 ;;;;;;;;;;;;;;
 ;; File access
